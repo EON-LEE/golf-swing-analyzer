@@ -16,6 +16,14 @@ logger = setup_logger(__name__)
 @handle_errors
 def main():
     """Main application entry point."""
+    # Initialize and validate configuration
+    try:
+        Config.validate_config()
+        Config.create_directories()
+    except Exception as e:
+        st.error(f"❌ 설정 오류: {e}")
+        return
+    
     st.set_page_config(
         page_title="Golf Swing 3D Analyzer",
         page_icon="⛳",
@@ -24,9 +32,6 @@ def main():
     
     st.title("⛳ Golf Swing 3D Analyzer")
     st.markdown("골프 스윙 분석을 위한 AI 기반 도구")
-    
-    # Initialize configuration
-    Config.create_directories()
     
     # Sidebar configuration
     with st.sidebar:
@@ -53,22 +58,51 @@ def main():
         )
         
         if uploaded_file:
-            st.success(f"✅ 파일 업로드 완료: {uploaded_file.name}")
+            try:
+                # Validate uploaded file
+                from utils.validators import validate_uploaded_file
+                validate_uploaded_file(uploaded_file)
+                
+                st.success(f"✅ 파일 업로드 완료: {uploaded_file.name}")
+                
+                # Show file info
+                file_size_mb = uploaded_file.size / (1024 * 1024)
+                st.info(f"📁 파일 크기: {file_size_mb:.1f}MB")
+                
+            except Exception as e:
+                st.error(f"❌ 파일 검증 실패: {e}")
+                uploaded_file = None
             
             if st.button("🔍 분석 시작", type="primary"):
-                with st.spinner("비디오를 분석하는 중..."):
-                    try:
-                        # Run async analysis
-                        service = GolfSwingAnalysisService(confidence)
-                        result = asyncio.run(service.analyze_swing(uploaded_file))
-                        
-                        st.session_state['analysis_result'] = result
-                        st.success("✅ 분석 완료!")
-                        
-                    except VideoProcessingError as e:
-                        st.error(f"❌ 분석 실패: {e}")
-                    except Exception as e:
-                        st.error(f"❌ 예상치 못한 오류: {e}")
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                try:
+                    status_text.text("비디오 처리 중...")
+                    progress_bar.progress(25)
+                    
+                    # Run async analysis
+                    service = GolfSwingAnalysisService(confidence)
+                    
+                    status_text.text("포즈 추정 중...")
+                    progress_bar.progress(50)
+                    
+                    result = asyncio.run(service.analyze_swing(uploaded_file))
+                    
+                    progress_bar.progress(100)
+                    status_text.text("분석 완료!")
+                    
+                    st.session_state['analysis_result'] = result
+                    st.success("✅ 분석 완료!")
+                    
+                except VideoProcessingError as e:
+                    st.error(f"❌ 비디오 처리 실패: {e}")
+                except Exception as e:
+                    logger.error(f"Unexpected error: {e}", exc_info=True)
+                    st.error(f"❌ 예상치 못한 오류가 발생했습니다. 다시 시도해주세요.")
+                finally:
+                    progress_bar.empty()
+                    status_text.empty()
     
     with col2:
         st.subheader("분석 결과")

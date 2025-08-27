@@ -21,31 +21,45 @@ class GolfSwingAnalysisService:
     
     async def analyze_swing(self, video_file) -> dict:
         """Analyze golf swing from uploaded video."""
+        tmp_path = None
         try:
             # Save uploaded file temporarily
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
                 tmp_file.write(video_file.read())
                 tmp_path = Path(tmp_file.name)
             
+            logger.info(f"Processing video: {video_file.name} ({tmp_path.stat().st_size} bytes)")
+            
             # Process video
             pose_frames = await self.video_processor.process_video(tmp_path)
             
+            if not pose_frames:
+                raise VideoProcessingError("No pose data extracted from video")
+            
             # Calculate metrics
             metrics = self._calculate_metrics(pose_frames)
+            phases = self._detect_swing_phases(pose_frames)
             
-            # Clean up
-            tmp_path.unlink()
+            logger.info(f"Analysis complete: {len(pose_frames)} frames, {len(phases)} phases")
             
             return {
                 "success": True,
                 "frame_count": len(pose_frames),
                 "metrics": metrics.to_dict(),
-                "phases": self._detect_swing_phases(pose_frames)
+                "phases": phases
             }
             
         except Exception as e:
             logger.error(f"Analysis failed: {e}")
             raise VideoProcessingError(f"Failed to analyze swing: {e}")
+        finally:
+            # Clean up temporary file
+            if tmp_path and tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                    logger.debug(f"Cleaned up temporary file: {tmp_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up {tmp_path}: {e}")
     
     def _calculate_metrics(self, frames: List[PoseFrame]) -> SwingMetrics:
         """Calculate swing metrics from pose frames."""

@@ -54,7 +54,7 @@ class VideoProcessor:
             return await self._process_frames(video_path, pose)
     
     async def _process_frames(self, video_path: Path, pose) -> List[PoseFrame]:
-        """Process video frames."""
+        """Process video frames with proper resource management."""
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
             raise VideoProcessingError(f"Cannot open video: {video_path}")
@@ -63,19 +63,21 @@ class VideoProcessor:
         frame_number = 0
         
         try:
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
                     break
                 
-                # Process frame
                 pose_frame = await self._process_single_frame(frame, frame_number, pose)
                 frames.append(pose_frame)
                 frame_number += 1
                 
-                # Yield control periodically
-                if frame_number % 10 == 0:
+                # Yield control and log progress
+                if frame_number % Config.ASYNC_BATCH_SIZE == 0:
                     await asyncio.sleep(0)
+                    logger.debug(f"Processed {frame_number}/{total_frames} frames")
                     
         finally:
             cap.release()

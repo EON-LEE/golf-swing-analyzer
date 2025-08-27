@@ -7,6 +7,10 @@ flake8==7.0.0
 mypy==1.8.0
 pre-commit==3.6.0
 
+# CLI tools
+click==8.1.7
+rich==13.7.0
+
 # Documentation
 sphinx==7.2.6
 sphinx-rtd-theme==2.0.0

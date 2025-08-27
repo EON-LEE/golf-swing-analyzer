@@ -6,6 +6,7 @@ matplotlib==3.8.3
 pillow==10.2.0
 python-multipart==0.0.9
 python-dotenv==1.0.1
+python-magic==0.4.27
 
 # ML/AI dependencies
 mediapipe==0.10.21
