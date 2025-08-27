@@ -4,10 +4,7 @@ from pathlib import Path
 from typing import Optional
 import cv2
 from config import Config
-
-class ValidationError(Exception):
-    """Custom validation error."""
-    pass
+from exceptions import ValidationError
 
 def validate_video_file(file_path: Path) -> None:
     """Validate video file format and size."""

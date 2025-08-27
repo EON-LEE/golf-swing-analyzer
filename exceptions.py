@@ -8,10 +8,18 @@ class VideoProcessingError(GolfAnalyzerError):
     """Video processing related errors."""
     pass
 
+class ValidationError(GolfAnalyzerError):
+    """Input validation errors."""
+    pass
+
 class PoseEstimationError(GolfAnalyzerError):
     """Pose estimation related errors."""
     pass
 
 class ConfigurationError(GolfAnalyzerError):
     """Configuration related errors."""
+    pass
+
+class ModelError(GolfAnalyzerError):
+    """ML model related errors."""
     pass

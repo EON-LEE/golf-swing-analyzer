@@ -25,7 +25,8 @@ pytube==15.0.0
 # 3D processing
 open3d
 
-# Utilities
+# Monitoring and utilities
+psutil>=5.9.0
 rich>=10.14.0
 python-jose==3.3.0
 
