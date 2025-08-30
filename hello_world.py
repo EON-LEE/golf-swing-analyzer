@@ -6,7 +6,6 @@ Simple greeting functionality with Korean support
 """
 
 import logging
-from typing import NoReturn
 
 # Configure logging with proper format
 logging.basicConfig(
@@ -33,7 +32,7 @@ def hello_world() -> None:
         raise RuntimeError(error_msg) from e
 
 
-def main() -> NoReturn:
+def main() -> None:
     """Main entry point for the module."""
     try:
         hello_world()
