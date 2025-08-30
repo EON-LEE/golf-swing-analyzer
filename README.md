@@ -76,4 +76,8 @@ streamlit run app.py
 
 ## 문의사항
 
-버그 리포트나 기능 개선 제안은 GitHub Issues를 통해 제출해 주시기 바랍니다. 
+버그 리포트나 기능 개선 제안은 GitHub Issues를 통해 제출해 주시기 바랍니다.
+
+## 업데이트 기록
+
+**Last Updated**: 2025-08-30T01:50:41.435Z
