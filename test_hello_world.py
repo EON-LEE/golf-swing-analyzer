@@ -8,7 +8,7 @@ Comprehensive test suite with proper setup and teardown
 import unittest
 import logging
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from hello_world import hello_world, main
 
 
@@ -116,6 +116,36 @@ class TestModuleIntegration(unittest.TestCase):
         logger = hello_world.logger
         self.assertEqual(logger.name, 'hello_world')
         self.assertGreaterEqual(logger.level, logging.INFO)
+
+
+class TestStreamlitDemo(unittest.TestCase):
+    """Test cases for Streamlit demo functionality"""
+
+    @patch('demo_hello_world.st')
+    def test_demo_main_function(self, mock_st):
+        """Test that demo main function runs without errors"""
+        # Mock Streamlit components
+        mock_st.set_page_config = MagicMock()
+        mock_st.markdown = MagicMock()
+        mock_st.columns = MagicMock(return_value=[MagicMock(), MagicMock()])
+        mock_st.sidebar = MagicMock()
+        
+        try:
+            import demo_hello_world
+            demo_hello_world.main()
+        except ImportError:
+            self.skipTest("demo_hello_world module not available")
+        except Exception as e:
+            self.fail(f"Demo main() raised {type(e).__name__}: {e}")
+
+    def test_demo_chart_creation(self):
+        """Test chart creation function"""
+        try:
+            import demo_hello_world
+            fig = demo_hello_world.create_animated_chart()
+            self.assertIsNotNone(fig)
+        except ImportError:
+            self.skipTest("demo_hello_world module not available")
 
 
 if __name__ == "__main__":
