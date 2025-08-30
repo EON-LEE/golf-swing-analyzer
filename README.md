@@ -50,7 +50,11 @@ pip install -r requirements.txt
 
 2. 서버 실행:
 ```bash
-streamlit run app.py
+# 메인 골프 스윙 분석기
+streamlit run demo/src/app.py
+
+# 아름다운 Hello World 데모 (SMP-7)
+streamlit run demo_hello_world.py
 ```
 
 ## 기능
