@@ -80,4 +80,4 @@ streamlit run app.py
 
 ## 업데이트 기록
 
-**Last Updated**: 2025-08-30T01:50:41.435Z
+**Last Updated**: 2025-08-30T02:10:42.990Z
