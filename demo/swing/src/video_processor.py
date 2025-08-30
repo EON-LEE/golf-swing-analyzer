@@ -1,131 +1,212 @@
+"""Video processing utilities for golf swing analysis."""
+
 import cv2
 import numpy as np
-from typing import Optional, Tuple, Generator, Dict
-from pytube import YouTube
-import tempfile
-import os
 import logging
+from typing import Optional, Tuple, List
+import os
+from config import VIDEO_SETTINGS
 
 logger = logging.getLogger(__name__)
 
 class VideoProcessor:
-    """Handles video processing from various sources (YouTube, local file, webcam)."""
+    """Handles video processing operations."""
     
     def __init__(self):
-        self.temp_dir = tempfile.mkdtemp()
+        """Initialize video processor."""
+        self.supported_formats = VIDEO_SETTINGS['supported_formats']
+        self.target_height = VIDEO_SETTINGS['target_height']
+        logger.info("VideoProcessor initialized")
+    
+    def validate_video(self, video_path: str) -> bool:
+        """
+        Validate video file format and accessibility.
         
-    def process_youtube_url(self, url: str) -> str:
-        """Download video from YouTube URL and return local path."""
-        try:
-            yt = YouTube(url)
-            video = yt.streams.filter(progressive=True, file_extension='mp4').first()
-            if not video:
-                raise ValueError("No suitable video stream found")
+        Args:
+            video_path: Path to video file
             
-            output_path = os.path.join(self.temp_dir, f"{yt.video_id}_{video.resolution}.mp4")
-            video.download(output_path=os.path.dirname(output_path), filename=os.path.basename(output_path))
-            return output_path
+        Returns:
+            True if valid, False otherwise
+        """
+        try:
+            if not os.path.exists(video_path):
+                logger.error(f"Video file not found: {video_path}")
+                return False
+            
+            # Check file extension
+            file_ext = os.path.splitext(video_path)[1].lower()
+            if file_ext not in self.supported_formats:
+                logger.error(f"Unsupported format: {file_ext}")
+                return False
+            
+            # Try to open video
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                logger.error(f"Cannot open video: {video_path}")
+                return False
+            
+            # Check if video has frames
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+            
+            if frame_count == 0:
+                logger.error(f"Video has no frames: {video_path}")
+                return False
+            
+            logger.info(f"Video validation successful: {frame_count} frames")
+            return True
+            
         except Exception as e:
-            raise ValueError(f"Error processing YouTube URL: {str(e)}")
+            logger.error(f"Error validating video: {e}")
+            return False
     
-    def process_local_file(self, file_path: str) -> str:
-        """Process local video file and return path."""
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
-        return file_path
-    
-    def get_video_properties(self, video_path: str) -> Dict[str, int]:
-        """Get video properties (width, height, fps, total_frames) as a dictionary."""
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open video: {video_path}")
+    def get_video_info(self, video_path: str) -> Optional[dict]:
+        """
+        Get video information.
         
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        cap.release()
-        return {
-            'width': width,
-            'height': height,
-            'fps': fps,
-            'total_frames': total_frames
-        }
-    
-    def extract_frames(self, video_path: str, 
-                      start_frame: int = 0, 
-                      end_frame: Optional[int] = None) -> Generator[np.ndarray, None, None]:
-        """Extract frames from video as a generator."""
+        Args:
+            video_path: Path to video file
+            
+        Returns:
+            Dictionary with video info or None if failed
+        """
         try:
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
-                raise ValueError(f"Could not open video: {video_path}")
+                return None
+            
+            info = {
+                'frame_count': int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+                'fps': cap.get(cv2.CAP_PROP_FPS),
+                'width': int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                'height': int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                'duration': 0
+            }
+            
+            if info['fps'] > 0:
+                info['duration'] = info['frame_count'] / info['fps']
+            
+            cap.release()
+            return info
+            
+        except Exception as e:
+            logger.error(f"Error getting video info: {e}")
+            return None
+    
+    def resize_frame(self, frame: np.ndarray, target_height: Optional[int] = None) -> np.ndarray:
+        """
+        Resize frame while maintaining aspect ratio.
+        
+        Args:
+            frame: Input frame
+            target_height: Target height (uses default if None)
+            
+        Returns:
+            Resized frame
+        """
+        try:
+            if target_height is None:
+                target_height = self.target_height
+            
+            h, w = frame.shape[:2]
+            if h == target_height:
+                return frame
+            
+            aspect_ratio = w / h
+            target_width = int(target_height * aspect_ratio)
+            
+            resized = cv2.resize(frame, (target_width, target_height))
+            return resized
+            
+        except Exception as e:
+            logger.error(f"Error resizing frame: {e}")
+            return frame
+    
+    def extract_frames(self, video_path: str, max_frames: Optional[int] = None) -> List[np.ndarray]:
+        """
+        Extract frames from video.
+        
+        Args:
+            video_path: Path to video file
+            max_frames: Maximum number of frames to extract
+            
+        Returns:
+            List of frames
+        """
+        frames = []
+        cap = None
+        
+        try:
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                logger.error(f"Cannot open video: {video_path}")
+                return frames
             
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if end_frame is None:
-                end_frame = total_frames
             
-            # Set start position
-            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+            if max_frames is None:
+                max_frames = VIDEO_SETTINGS['max_frames']
             
-            logger.info(f"Starting frame extraction: {start_frame} to {end_frame}")
-            frame_count = start_frame
-            while frame_count < end_frame:
+            # Calculate skip ratio
+            skip_frames = max(1, total_frames // max_frames) if max_frames < total_frames else 1
+            
+            frame_count = 0
+            extracted_count = 0
+            
+            while cap.isOpened() and extracted_count < max_frames:
                 ret, frame = cap.read()
                 if not ret:
-                    logger.warning(f"Failed to read frame {frame_count}")
                     break
-                    
-                yield frame
+                
+                if frame_count % skip_frames == 0:
+                    # Resize frame for efficiency
+                    resized_frame = self.resize_frame(frame)
+                    frames.append(resized_frame)
+                    extracted_count += 1
+                
                 frame_count += 1
-                if frame_count % 30 == 0:  # Log every 30 frames
-                    logger.info(f"Processed {frame_count}/{end_frame} frames")
             
-            logger.info(f"Completed frame extraction: {frame_count} frames processed")
+            logger.info(f"Extracted {len(frames)} frames from {total_frames} total frames")
+            return frames
+            
         except Exception as e:
-            logger.error(f"Error during frame extraction: {str(e)}")
-            raise
+            logger.error(f"Error extracting frames: {e}")
+            return frames
         finally:
-            cap.release()
-    
-    def get_frame_at_index(self, video_path: str, index: int) -> Optional[np.ndarray]:
-        """Reads and returns a single frame at the specified index."""
-        try:
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                logger.warning(f"Could not open video {video_path} to get frame at index {index}")
-                return None
-            
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if index < 0 or index >= total_frames:
-                logger.warning(f"Frame index {index} is out of bounds (0-{total_frames-1}).")
+            if cap is not None:
                 cap.release()
-                return None
-                
-            cap.set(cv2.CAP_PROP_POS_FRAMES, index)
-            ret, frame = cap.read()
-            
-            if not ret:
-                logger.warning(f"Failed to read frame at index {index} from {video_path}.")
-                return None
-                
-            return frame
-        except Exception as e:
-            logger.error(f"Error reading frame at index {index}: {str(e)}")
-            return None
-        finally:
-            cap.release()
     
-    def cleanup(self):
-        """Clean up temporary files."""
+    def create_sequence_image(self, frames: List[np.ndarray], labels: Optional[List[str]] = None) -> Optional[np.ndarray]:
+        """
+        Create a sequence image from multiple frames.
+        
+        Args:
+            frames: List of frames
+            labels: Optional labels for each frame
+            
+        Returns:
+            Combined sequence image or None if failed
+        """
         try:
-            for file in os.listdir(self.temp_dir):
-                try:
-                    os.remove(os.path.join(self.temp_dir, file))
-                except Exception as e:
-                    logger.warning(f"Could not remove temp file {file}: {e}")
-            os.rmdir(self.temp_dir)
-            logger.info(f"Cleaned up temp directory: {self.temp_dir}")
+            if not frames:
+                return None
+            
+            # Resize all frames to same height
+            processed_frames = []
+            for i, frame in enumerate(frames):
+                resized = self.resize_frame(frame)
+                
+                # Add label if provided
+                if labels and i < len(labels):
+                    cv2.putText(resized, labels[i], (10, 30), 
+                              cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                
+                processed_frames.append(resized)
+            
+            # Combine horizontally
+            sequence_image = np.hstack(processed_frames)
+            return sequence_image
+            
         except Exception as e:
-            logger.error(f"Error during cleanup of {self.temp_dir}: {e}") 
+            logger.error(f"Error creating sequence image: {e}")
+            return None

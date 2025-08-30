@@ -1,31 +1,10 @@
-python-multipart==0.0.9
-python-jose==3.3.0
-python-dotenv==1.0.1
-matplotlib==3.8.3
-pillow==10.2.0
-rich>=10.14.0
-opencv-python-headless==4.9.0.80
+mediapipe==0.10.21
+opencv-python==4.9.0.80
 numpy==1.26.4
 streamlit==1.32.2
-<<<<<<< HEAD
-mediapipe==0.10.9
-=======
-mediapipe==0.10.9
+matplotlib==3.8.3
+pillow==10.2.0
+python-multipart==0.0.9
+python-dotenv==1.0.1
 plotly==5.18.0
 pandas==2.2.1
-moviepy==1.0.3
-pytube==15.0.0
-torch==2.5.1
-timm
-open3d
-# pip install "git+https://github.com/facebookresearch/pytorch3d.git"
-# pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.1_cu118.html
-seaborn
-transformers
-streamlit 
-opencv-python 
-mediapipe 
-transformers 
-torch 
-moviepy
->>>>>>> 8a1f375 (initial commit)

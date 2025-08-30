@@ -14,6 +14,12 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import plotly.graph_objects as go
 
+from config import (
+    MAX_FRAMES, SUPPORTED_VIDEO_FORMATS, LOG_LEVEL, 
+    LOG_MAX_BYTES, LOG_BACKUP_COUNT, KEY_FRAME_RATIOS
+)
+from utils import validate_video_file, get_video_info, cleanup_temp_files
+
 # Streamlit 페이지 설정
 st.set_page_config(
     page_title="골프 스윙 분석기",
@@ -26,14 +32,14 @@ LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=getattr(logging, LOG_LEVEL),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 file_handler = logging.handlers.RotatingFileHandler(
     os.path.join(LOG_DIR, "app.log"),
-    maxBytes=10*1024*1024,
-    backupCount=5
+    maxBytes=LOG_MAX_BYTES,
+    backupCount=LOG_BACKUP_COUNT
 )
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logging.getLogger().addHandler(file_handler)
@@ -42,6 +48,31 @@ logger = logging.getLogger(__name__)
 # 임시 디렉토리 설정
 TEMP_DIR = os.path.join(tempfile.gettempdir(), "golf_swing_analyzer")
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+# 지원되는 비디오 형식
+SUPPORTED_VIDEO_FORMATS = ['.mp4', '.avi', '.mov']
+
+def validate_video_file(file_path: str, supported_formats: list) -> bool:
+    """비디오 파일 유효성 검사"""
+    try:
+        if not os.path.exists(file_path):
+            return False
+        
+        # 파일 크기 확인 (최소 1KB)
+        if os.path.getsize(file_path) < 1024:
+            return False
+        
+        # OpenCV로 비디오 열기 테스트
+        cap = cv2.VideoCapture(file_path)
+        if not cap.isOpened():
+            return False
+        
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+        
+        return frame_count > 0
+    except Exception:
+        return False
 
 # 세션 상태 초기화
 if 'models' not in st.session_state:
@@ -53,42 +84,21 @@ if 'analysis_complete' not in st.session_state:
 def load_models():
     """모델 로드 및 캐싱"""
     try:
-        import importlib
-        import pose_estimation
-        import swing_analyzer
-        import video_processor
-        import analysis_service
-        
-        # 모듈 리로드
-        importlib.reload(pose_estimation)
-        importlib.reload(swing_analyzer)
-        importlib.reload(video_processor)
-        importlib.reload(analysis_service)
-        
         # 클래스 임포트
         from pose_estimation import PoseEstimator
         from swing_analyzer import SwingAnalyzer
         from video_processor import VideoProcessor
         from analysis_service import SwingAnalysisService
         
-        logger.debug("Initializing models...")
+        logger.info("Initializing models...")
         pose_estimator = PoseEstimator()
         swing_analyzer = SwingAnalyzer()
         video_processor = VideoProcessor()
         analysis_service = SwingAnalysisService()
         
-        # 모델 초기화 확인
-        logger.debug(f"PoseEstimator methods: {dir(pose_estimator)}")
-        logger.debug(f"SwingAnalyzer methods: {dir(swing_analyzer)}")
-        logger.debug(f"VideoProcessor methods: {dir(video_processor)}")
-        logger.debug(f"AnalysisService methods: {dir(analysis_service)}")
+        logger.info("Models loaded successfully")
+        return (pose_estimator, swing_analyzer, video_processor, analysis_service)
         
-        return (
-            pose_estimator,
-            swing_analyzer,
-            video_processor,
-            analysis_service
-        )
     except Exception as e:
         logger.error(f"모델 로딩 중 오류: {str(e)}", exc_info=True)
         st.error(f"모델 로딩 중 오류가 발생했습니다: {str(e)}")
@@ -98,12 +108,10 @@ def get_models() -> Optional[Tuple]:
     """세션에서 모델 가져오기"""
     try:
         if st.session_state.models is None:
-            logger.debug("Loading models for the first time...")
+            logger.info("Loading models for the first time...")
             st.session_state.models = load_models()
             if st.session_state.models is not None:
-                logger.debug("Models loaded successfully")
-                pose_estimator, swing_analyzer, video_processor, analysis_service = st.session_state.models
-                logger.debug(f"SwingAnalyzer methods after loading: {dir(swing_analyzer)}")
+                logger.info("Models loaded successfully")
             else:
                 logger.error("Failed to load models")
         return st.session_state.models
@@ -116,18 +124,40 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
     try:
         if uploaded_file is None:
             return None
+        
+        # 파일 크기 검사 (최대 100MB)
+        max_size = 100 * 1024 * 1024
+        if uploaded_file.size > max_size:
+            st.error(f"파일 크기가 너무 큽니다. 최대 {max_size // (1024*1024)}MB까지 업로드 가능합니다.")
+            return None
             
         file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-        if file_ext not in ['.mp4', '.avi', '.mov']:
-            st.error("지원하지 않는 파일 형식입니다. MP4, AVI, MOV 파일만 업로드 가능합니다.")
+        if file_ext not in SUPPORTED_VIDEO_FORMATS:
+            st.error(f"지원하지 않는 파일 형식입니다. {', '.join(SUPPORTED_VIDEO_FORMATS)} 파일만 업로드 가능합니다.")
+            return None
+        
+        # 파일명 검증
+        if not uploaded_file.name or len(uploaded_file.name.strip()) == 0:
+            st.error("유효하지 않은 파일명입니다.")
             return None
             
         video_id = f"output_video_{str(uuid.uuid4())[:8]}{file_ext}"
         temp_path = os.path.join(TEMP_DIR, video_id)
         
+        # 임시 디렉토리 확인
+        os.makedirs(TEMP_DIR, exist_ok=True)
+        
         with open(temp_path, "wb") as f:
             f.write(uploaded_file.getvalue())
-            
+        
+        # 파일 유효성 검사
+        if not validate_video_file(temp_path, SUPPORTED_VIDEO_FORMATS):
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            st.error("업로드된 파일이 유효하지 않습니다.")
+            return None
+        
+        logger.info(f"File saved successfully: {temp_path}")
         return temp_path
     except Exception as e:
         logger.error(f"파일 저장 중 오류: {str(e)}")
@@ -135,7 +165,8 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         return None
 
 def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
-    """골프 스윙 비디오 분석"""
+    """골프 스윙 비디오 분석 - 메모리 효율적으로 개선"""
+    cap = None
     try:
         if not os.path.exists(video_path):
             st.error("비디오 파일을 찾을 수 없습니다.")
@@ -146,15 +177,10 @@ def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
             return None
             
         pose_estimator, swing_analyzer, _, _ = models
-
         logger.info(f"Starting analysis for video: {video_path}")
         
         progress_bar = st.progress(0)
         status_text = st.empty()
-        
-        frames_data = []
-        frame_angles = []
-        frame_count = 0
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -166,97 +192,93 @@ def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
             st.error("비디오 파일이 비어있습니다.")
             return None
         
-        # 프레임 처리
+        # 메모리 효율적인 프레임 처리
+        frames_data = []
+        frame_count = 0
+        skip_frames = max(1, total_frames // MAX_FRAMES)  # 설정된 최대 프레임으로 제한
+        
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
                 
-            try:
-                processed_frame, landmarks = pose_estimator.process_frame(frame)
-                if landmarks:
-                    angles = pose_estimator.calculate_angles(landmarks)
-                    frame_angles.append(angles)
-                    
-                    # landmarks를 딕셔너리로 변환
-                    landmarks_data = {
-                        'left_shoulder': landmarks.left_shoulder.tolist(),
-                        'right_shoulder': landmarks.right_shoulder.tolist(),
-                        'left_elbow': landmarks.left_elbow.tolist(),
-                        'right_elbow': landmarks.right_elbow.tolist(),
-                        'left_wrist': landmarks.left_wrist.tolist(),
-                        'right_wrist': landmarks.right_wrist.tolist(),
-                        'left_hip': landmarks.left_hip.tolist(),
-                        'right_hip': landmarks.right_hip.tolist(),
-                        'left_knee': landmarks.left_knee.tolist(),
-                        'right_knee': landmarks.right_knee.tolist(),
-                        'left_ankle': landmarks.left_ankle.tolist(),
-                        'right_ankle': landmarks.right_ankle.tolist(),
-                        'nose': landmarks.nose.tolist() if hasattr(landmarks, 'nose') else [0, 0, 0]
-                    }
-                    
-                    frames_data.append({
-                        'angles': angles,
-                        'landmarks': landmarks_data
-                    })
-                    
-                    logger.debug(f"프레임 {frame_count} 처리 완료: {len(landmarks_data)} 랜드마크, {len(angles)} 각도")
-            except Exception as frame_error:
-                logger.error(f"프레임 {frame_count} 처리 중 오류: {str(frame_error)}")
-                continue
+            # 프레임 스킵으로 메모리 사용량 줄이기
+            if frame_count % skip_frames == 0:
+                try:
+                    processed_frame, landmarks = pose_estimator.process_frame(frame)
+                    if landmarks:
+                        angles = pose_estimator.calculate_angles(landmarks)
+                        
+                        # 랜드마크를 딕셔너리로 변환
+                        landmarks_data = {
+                            'left_shoulder': landmarks.left_shoulder.tolist(),
+                            'right_shoulder': landmarks.right_shoulder.tolist(),
+                            'left_elbow': landmarks.left_elbow.tolist(),
+                            'right_elbow': landmarks.right_elbow.tolist(),
+                            'left_wrist': landmarks.left_wrist.tolist(),
+                            'right_wrist': landmarks.right_wrist.tolist(),
+                            'left_hip': landmarks.left_hip.tolist(),
+                            'right_hip': landmarks.right_hip.tolist(),
+                            'left_knee': landmarks.left_knee.tolist(),
+                            'right_knee': landmarks.right_knee.tolist(),
+                            'left_ankle': landmarks.left_ankle.tolist(),
+                            'right_ankle': landmarks.right_ankle.tolist(),
+                            'nose': landmarks.nose.tolist() if hasattr(landmarks, 'nose') else [0, 0, 0]
+                        }
+                        
+                        frames_data.append({
+                            'angles': angles,
+                            'landmarks': landmarks_data
+                        })
+                        
+                except Exception as frame_error:
+                    logger.warning(f"프레임 {frame_count} 처리 중 오류: {str(frame_error)}")
+                    continue
                     
             frame_count += 1
-            progress = int((frame_count / total_frames) * 100)
-            progress_bar.progress(progress)
-            status_text.text(f"프레임 처리 중... {progress}%")
+            if frame_count % 10 == 0:  # 진행률 업데이트 빈도 줄이기
+                progress = int((frame_count / total_frames) * 100)
+                progress_bar.progress(progress)
+                status_text.text(f"프레임 처리 중... {progress}%")
                 
-        cap.release()
-        progress_bar.empty()
-        status_text.empty()
-
         if not frames_data:
             st.error("비디오에서 유효한 프레임을 찾을 수 없습니다.")
             return None
 
         logger.info(f"분석 완료: {len(frames_data)} 프레임 처리됨")
         
-        # 키 프레임 설정 - 0-based 인덱스 사용
+        # 키 프레임 설정 - 설정 파일의 비율 사용
         total_valid_frames = len(frames_data)
-        key_frames = {
-            'address': 0,  # 첫 번째 유효한 프레임을 어드레스로 설정
-            'backswing': min(int(total_valid_frames * 0.3), total_valid_frames - 1),
-            'top': min(int(total_valid_frames * 0.5), total_valid_frames - 1),
-            'impact': min(int(total_valid_frames * 0.7), total_valid_frames - 1),
-            'follow_through': min(int(total_valid_frames * 0.85), total_valid_frames - 1),
-            'finish': total_valid_frames - 1  # 마지막 유효한 프레임
-        }
-        
-        logger.debug(f"Key frames before metrics calculation: {key_frames}")
+        key_frames = {}
+        for phase, ratio in KEY_FRAME_RATIOS.items():
+            if ratio == 0.0:
+                key_frames[phase] = 0
+            elif ratio == 1.0:
+                key_frames[phase] = total_valid_frames - 1
+            else:
+                key_frames[phase] = min(int(total_valid_frames * ratio), total_valid_frames - 1)
         
         # 메트릭스 계산
-        try:
-            metrics = swing_analyzer._calculate_metrics(frames_data, key_frames)
-            logger.debug(f"Calculated metrics: {metrics}")
+        metrics = swing_analyzer._calculate_metrics(frames_data, key_frames)
+        evaluations = swing_analyzer._evaluate_swing(frames_data, key_frames, metrics)
+        
+        return {
+            "message": "분석이 완료되었습니다.",
+            "frames": frames_data,
+            "metrics": metrics,
+            "key_frames": key_frames,
+            "evaluations": evaluations
+        }
             
-            # 스윙 평가 수행
-            evaluations = swing_analyzer._evaluate_swing(frames_data, key_frames, metrics)
-            logger.debug(f"Generated evaluations: {evaluations}")
-            
-            return {
-                "message": "분석이 완료되었습니다.",
-                "frames": frames_data,
-                "metrics": metrics,
-                "key_frames": key_frames,
-                "evaluations": evaluations
-            }
-        except Exception as e:
-            logger.error(f"Error in analyze_swing: {str(e)}", exc_info=True)
-            st.error(f"분석 중 오류가 발생했습니다: {str(e)}")
-            return None
     except Exception as e:
         logger.error(f"Error in analyze_swing: {str(e)}", exc_info=True)
         st.error(f"분석 중 오류가 발생했습니다: {str(e)}")
         return None
+    finally:
+        if cap is not None:
+            cap.release()
+        progress_bar.empty()
+        status_text.empty()
 
 def create_sequence_image(video_path: str, key_frames: Dict[str, int]) -> Optional[np.ndarray]:
     """스윙 시퀀스 이미지 생성"""
@@ -353,6 +375,9 @@ def main():
     """메인 애플리케이션"""
     st.title("골프 스윙 분석기 🏌️")
     st.write("골프 스윙 영상을 업로드하여 자세를 분석해보세요!")
+
+    # 임시 파일 정리
+    cleanup_temp_files(TEMP_DIR)
 
     # 모델 로드
     models = get_models()
