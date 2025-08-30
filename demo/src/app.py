@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+from config import MAX_FRAMES
 
 # Streamlit 페이지 설정
 st.set_page_config(
@@ -69,17 +70,11 @@ def load_models():
         from video_processor import VideoProcessor
         from analysis_service import SwingAnalysisService
         
-        logger.debug("Initializing models...")
+        logger.info("Initializing models...")
         pose_estimator = PoseEstimator()
         swing_analyzer = SwingAnalyzer()
         video_processor = VideoProcessor()
         analysis_service = SwingAnalysisService()
-        
-        # 모델 초기화 확인
-        logger.debug(f"PoseEstimator methods: {dir(pose_estimator)}")
-        logger.debug(f"SwingAnalyzer methods: {dir(swing_analyzer)}")
-        logger.debug(f"VideoProcessor methods: {dir(video_processor)}")
-        logger.debug(f"AnalysisService methods: {dir(analysis_service)}")
         
         return (
             pose_estimator,
@@ -96,12 +91,10 @@ def get_models() -> Optional[Tuple]:
     """세션에서 모델 가져오기"""
     try:
         if st.session_state.models is None:
-            logger.debug("Loading models for the first time...")
+            logger.info("Loading models for the first time...")
             st.session_state.models = load_models()
             if st.session_state.models is not None:
-                logger.debug("Models loaded successfully")
-                pose_estimator, swing_analyzer, video_processor, analysis_service = st.session_state.models
-                logger.debug(f"SwingAnalyzer methods after loading: {dir(swing_analyzer)}")
+                logger.info("Models loaded successfully")
             else:
                 logger.error("Failed to load models")
         return st.session_state.models
@@ -111,13 +104,24 @@ def get_models() -> Optional[Tuple]:
 
 def save_uploaded_file(uploaded_file) -> Optional[str]:
     """업로드된 파일을 저장하고 경로를 반환"""
+    temp_path = None
     try:
         if uploaded_file is None:
+            return None
+        
+        # File size validation (100MB limit)
+        if uploaded_file.size > 100 * 1024 * 1024:
+            st.error("파일 크기가 너무 큽니다. 100MB 이하의 파일만 업로드 가능합니다.")
             return None
             
         file_ext = os.path.splitext(uploaded_file.name)[1].lower()
         if file_ext not in ['.mp4', '.avi', '.mov']:
             st.error("지원하지 않는 파일 형식입니다. MP4, AVI, MOV 파일만 업로드 가능합니다.")
+            return None
+        
+        # Validate file name
+        if not uploaded_file.name or len(uploaded_file.name.strip()) == 0:
+            st.error("유효하지 않은 파일명입니다.")
             return None
             
         video_id = f"output_video_{str(uuid.uuid4())[:8]}{file_ext}"
@@ -125,11 +129,24 @@ def save_uploaded_file(uploaded_file) -> Optional[str]:
         
         with open(temp_path, "wb") as f:
             f.write(uploaded_file.getvalue())
+        
+        # Verify file was written correctly
+        if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+            st.error("파일 저장에 실패했습니다.")
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+            return None
             
         return temp_path
     except Exception as e:
         logger.error(f"파일 저장 중 오류: {str(e)}")
         st.error(f"파일 저장 중 오류가 발생했습니다: {str(e)}")
+        # Clean up failed file
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
         return None
 
 def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
@@ -153,6 +170,7 @@ def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
         frames_data = []
         frame_angles = []
         frame_count = 0
+        processed_frames = 0
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -162,13 +180,23 @@ def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if total_frames == 0:
             st.error("비디오 파일이 비어있습니다.")
+            cap.release()
             return None
         
+        # Calculate frame skip ratio for large videos
+        skip_ratio = max(1, total_frames // MAX_FRAMES) if total_frames > MAX_FRAMES else 1
+        
         # 프레임 처리
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
+        try:
+            while cap.isOpened() and processed_frames < MAX_FRAMES:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                # Skip frames based on ratio
+                if frame_count % skip_ratio != 0:
+                    frame_count += 1
+                    continue
                 
             try:
                 processed_frame, landmarks = pose_estimator.process_frame(frame)
@@ -197,20 +225,19 @@ def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
                         'angles': angles,
                         'landmarks': landmarks_data
                     })
-                    
-                    logger.debug(f"프레임 {frame_count} 처리 완료: {len(landmarks_data)} 랜드마크, {len(angles)} 각도")
+                    processed_frames += 1
             except Exception as frame_error:
                 logger.error(f"프레임 {frame_count} 처리 중 오류: {str(frame_error)}")
                 continue
                     
             frame_count += 1
-            progress = int((frame_count / total_frames) * 100)
+            progress = min(100, int((processed_frames / MAX_FRAMES) * 100))
             progress_bar.progress(progress)
-            status_text.text(f"프레임 처리 중... {progress}%")
-                
-        cap.release()
-        progress_bar.empty()
-        status_text.empty()
+            status_text.text(f"프레임 처리 중... ({processed_frames}/{min(MAX_FRAMES, total_frames)})")
+        finally:
+            cap.release()
+            progress_bar.empty()
+            status_text.empty()
 
         if not frames_data:
             st.error("비디오에서 유효한 프레임을 찾을 수 없습니다.")
@@ -229,16 +256,12 @@ def analyze_swing(video_path: str, models: Tuple) -> Optional[Dict]:
             'finish': total_valid_frames - 1  # 마지막 유효한 프레임
         }
         
-        logger.debug(f"Key frames before metrics calculation: {key_frames}")
-        
         # 메트릭스 계산
         try:
             metrics = swing_analyzer._calculate_metrics(frames_data, key_frames)
-            logger.debug(f"Calculated metrics: {metrics}")
             
             # 스윙 평가 수행
             evaluations = swing_analyzer._evaluate_swing(frames_data, key_frames, metrics)
-            logger.debug(f"Generated evaluations: {evaluations}")
             
             return {
                 "message": "분석이 완료되었습니다.",

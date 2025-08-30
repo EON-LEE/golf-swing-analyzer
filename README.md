@@ -78,6 +78,21 @@ streamlit run app.py
 
 버그 리포트나 기능 개선 제안은 GitHub Issues를 통해 제출해 주시기 바랍니다.
 
+## 새로운 기능 / New Features
+
+### 🚀 AstraSprint Pipeline Integration
+- **Feature**: End-to-end automated pipeline testing
+- **Added**: 2025-08-30T02:34:58.813Z
+- **Pipeline**: SMP-9 Complete Pipeline Test
+- **Components**: PR creation, Jira updates, Confluence documentation
+
+### 📋 Feature Documentation
+- **Feature**: Comprehensive feature documentation system
+- **Status**: ✅ Active
+- **Integration**: GitHub, Jira, Confluence
+- **Automation**: Full E2E pipeline support
+
 ## 업데이트 기록
 
-**Last Updated**: 2025-08-30T02:10:42.990Z
+**Last Updated**: 2025-08-30T02:34:58.813Z
+**Pipeline**: SMP-9 Implementation Complete
