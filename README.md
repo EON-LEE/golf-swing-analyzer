@@ -55,6 +55,11 @@ streamlit run demo/src/app.py
 
 # 아름다운 Hello World 데모 (SMP-7)
 streamlit run demo_hello_world.py
+
+# SMP-7 최신 구현 (2025-08-31)
+./run_smp7.sh
+# or
+streamlit run smp7_hello_world.py
 ```
 
 ## 기능

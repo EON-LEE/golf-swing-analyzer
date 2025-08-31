@@ -17,10 +17,10 @@ def test_imports():
         from config import MAX_FRAMES, SUPPORTED_VIDEO_FORMATS
         from utils import safe_divide, calculate_angle_3d, calculate_distance_3d
         logger.info("✅ All imports successful")
-        return True
+        assert True
     except ImportError as e:
         logger.error(f"❌ Import failed: {e}")
-        return False
+        assert False, f"Import failed: {e}"
 
 def test_safe_divide():
     """Test enhanced safe_divide function."""
@@ -45,7 +45,7 @@ def test_safe_divide():
     
     success = passed == len(test_cases)
     logger.info(f"✅ safe_divide: {passed}/{len(test_cases)} tests passed" if success else f"❌ safe_divide: {passed}/{len(test_cases)} tests passed")
-    return success
+    assert success, f"safe_divide test failed: {passed}/{len(test_cases)} tests passed"
 
 def test_angle_calculation():
     """Test enhanced angle calculation with edge cases."""
@@ -76,7 +76,7 @@ def test_angle_calculation():
     
     success = passed == len(edge_cases) and normal_passed
     logger.info(f"✅ calculate_angle_3d: All edge cases handled" if success else f"❌ calculate_angle_3d: Failed edge case handling")
-    return success
+    assert success, f"calculate_angle_3d test failed"
 
 def test_distance_calculation():
     """Test enhanced distance calculation."""
@@ -104,7 +104,7 @@ def test_distance_calculation():
     
     success = passed == len(edge_cases) and normal_passed
     logger.info(f"✅ calculate_distance_3d: All tests passed" if success else f"❌ calculate_distance_3d: Tests failed")
-    return success
+    assert success, f"calculate_distance_3d test failed"
 
 def test_configuration():
     """Test configuration constants are properly set."""
@@ -120,7 +120,7 @@ def test_configuration():
     
     success = all(checks)
     logger.info(f"✅ Configuration: All constants properly set" if success else f"❌ Configuration: Missing or invalid constants")
-    return success
+    assert success, f"Configuration test failed"
 
 def test_memory_efficiency():
     """Test memory efficiency improvements."""
@@ -141,7 +141,7 @@ def test_memory_efficiency():
     
     success = efficiency_check and ratio_check
     logger.info(f"✅ Memory efficiency: Frame limiting works correctly ({processed_frames}/{MAX_FRAMES})" if success else f"❌ Memory efficiency: Frame limiting failed")
-    return success
+    assert success, f"Memory efficiency test failed"
 
 def run_comprehensive_test():
     """Run all tests and provide final score."""

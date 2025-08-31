@@ -36,6 +36,18 @@ VIDEO_CONFIG = {
     'default_fps': 30
 }
 
+# Legacy constants for backward compatibility
+MAX_FRAMES = VIDEO_CONFIG['max_frames']
+SUPPORTED_VIDEO_FORMATS = VIDEO_CONFIG['supported_formats']
+THRESHOLDS = {
+    'angle_threshold': 5.0,
+    'distance_threshold': 0.1,
+    'velocity_threshold': 1.0,
+    'acceleration_threshold': 0.5,
+    'confidence_threshold': 0.7,
+    'smoothing_factor': 0.3
+}
+
 # Pipeline test configuration
 PIPELINE_CONFIG = {
     'timeout_seconds': 10,
