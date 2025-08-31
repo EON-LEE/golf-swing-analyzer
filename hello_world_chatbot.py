@@ -3,11 +3,6 @@ Hello World Chatbot - Streamlit Application
 A simple chatbot that responds to basic greetings in Korean and English.
 """
 
-import streamlit as st
-from typing import Dict, List, Optional
-from config import GREETING_KEYWORDS, FAREWELL_KEYWORDS, RESPONSES, APP_CONFIG, PREVIEW_MAX_LENGTH
-
-
 def initialize_session_state() -> None:
     """Initialize session state variables."""
     if "messages" not in st.session_state:
