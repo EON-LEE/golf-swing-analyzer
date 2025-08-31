@@ -48,12 +48,14 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Custom CSS
+    # Custom CSS for beautiful styling
     st.markdown("""
     <style>
     .main-header {
         font-size: 3rem;
-        color: #FF6B6B;
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 2rem;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
@@ -63,6 +65,9 @@ def main():
         color: #4ECDC4;
         text-align: center;
         margin-bottom: 1rem;
+    }
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
     </style>
     """, unsafe_allow_html=True)
