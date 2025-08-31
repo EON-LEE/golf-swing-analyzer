@@ -3,8 +3,6 @@ Hello World Chatbot - Streamlit Application
 A simple chatbot that responds to basic greetings in Korean and English.
 """
 
-import streamlit as st
-from typing import Dict, List
 
 # Configuration constants
 APP_CONFIG: Dict[str, str] = {
