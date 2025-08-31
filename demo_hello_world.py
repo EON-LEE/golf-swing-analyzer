@@ -1,128 +1,180 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Beautiful Streamlit Hello World Demo
-SMP-7: AstraSprint AI Auto Test Implementation
+Hello World Chat Application - SMP-7 Implementation
+A simple Streamlit-based chat interface with intentional bugs for testing.
 """
 
 import streamlit as st
-import plotly.graph_objects as go
+import time
+import matplotlib.pyplot as plt
 import numpy as np
-from datetime import datetime
+from typing import Dict, List, Any, Optional
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def create_animated_chart():
-    """Create beautiful animated visualization"""
-    t = np.linspace(0, 2*np.pi, 100)
-    x = np.cos(t)
-    y = np.sin(t)
+def create_animated_chart() -> plt.Figure:
+    """
+    Create a simple animated chart for testing purposes.
     
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=x, y=y,
-        mode='lines+markers',
-        line=dict(color='#FF6B6B', width=3),
-        marker=dict(size=8, color='#4ECDC4'),
-        name='Hello World Curve'
-    ))
-    
-    fig.update_layout(
-        title="🌟 Beautiful Hello World Visualization",
-        xaxis_title="X축",
-        yaxis_title="Y축",
-        template="plotly_dark",
-        height=400
-    )
-    return fig
+    Returns:
+        matplotlib.pyplot.Figure: A figure containing a sine wave plot
+        
+    Raises:
+        RuntimeError: If chart creation fails
+    """
+    try:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        x = np.linspace(0, 2*np.pi, 100)
+        y = np.sin(x)
+        ax.plot(x, y, 'b-', linewidth=2)
+        ax.set_title("Simple Sine Wave", fontsize=14)
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.grid(True, alpha=0.3)
+        return fig
+    except Exception as e:
+        logger.error(f"Failed to create chart: {e}")
+        raise RuntimeError(f"Chart creation failed: {e}") from e
 
-def main():
-    """Main Streamlit application"""
-    # Page config
-    st.set_page_config(
-        page_title="Hello World Demo",
-        page_icon="🌟",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+def generate_response(prompt: str) -> str:
+    """
+    Generate appropriate response based on user input.
     
-    # Custom CSS for beautiful styling
-    st.markdown("""
-    <style>
-    .main-header {
-        font-size: 3rem;
-        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
-        margin-bottom: 2rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-    .sub-header {
-        font-size: 1.5rem;
-        color: #4ECDC4;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    Args:
+        prompt: User input message
+        
+    Returns:
+        str: Generated response message
+    """
+    prompt_lower = prompt.lower().strip()
     
-    # Header
-    st.markdown('<h1 class="main-header">🌟 Hello World! 안녕하세요! 🌟</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Beautiful Streamlit Demo - SMP-7 Implementation</p>', unsafe_allow_html=True)
+    if "hello" in prompt_lower:
+        return "Hello there! How are you?"
+    elif "bye" in prompt_lower or "goodbye" in prompt_lower:
+        return "Goodbye! See you later!"
+    elif "how are you" in prompt_lower:
+        return "I'm doing great, thank you for asking!"
+    elif "help" in prompt_lower:
+        return "I can respond to greetings like 'hello' and 'bye'. Try saying hello!"
+    else:
+        return "I heard you! Thanks for your message."
+
+
+def initialize_session_state() -> None:
+    """Initialize Streamlit session state variables."""
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+        logger.info("Initialized session state with empty messages list")
+
+
+def display_chat_messages() -> None:
+    """Display all chat messages in the correct chronological order."""
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+
+def handle_user_input(prompt: str) -> None:
+    """
+    Process user input and generate response.
     
-    # Sidebar
+    Args:
+        prompt: User input message
+    """
+    if not prompt.strip():
+        st.warning("Please enter a message.")
+        return
+    
+    # Add user message
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # Generate and add response
+    response = generate_response(prompt)
+    st.session_state.messages.append({"role": "assistant", "content": response})
+        
+    with st.chat_message("assistant"):
+        st.markdown(response)
+    
+    logger.info(f"Processed message: {prompt[:50]}...")
+
+
+def render_sidebar() -> None:
+    """Render sidebar with chat controls and statistics."""
     with st.sidebar:
-        st.header("🎨 Demo Controls")
-        language = st.selectbox("언어 / Language", ["한국어", "English"])
-        show_chart = st.checkbox("차트 표시 / Show Chart", value=True)
-        animation_speed = st.slider("Animation Speed", 1, 10, 5)
-    
-    # Main content
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if language == "한국어":
-            st.subheader("🚀 프로젝트 정보")
-            st.info("골프 스윙 3D 분석기 프로젝트의 아름다운 데모입니다!")
-            st.success("✅ Streamlit 데모가 성공적으로 실행되었습니다!")
+        st.header("Chat Settings")
+        
+        # Clear chat functionality
+        if st.button("Clear Chat", type="primary"):
+            st.session_state.messages = []
+            st.rerun()
+            logger.info("Chat cleared by user")
+        
+        # Chat statistics
+        st.subheader("Statistics")
+        message_count = len(st.session_state.messages)
+        user_messages = len([m for m in st.session_state.messages if m["role"] == "user"])
+        assistant_messages = len([m for m in st.session_state.messages if m["role"] == "assistant"])
+        
+        st.metric("Total messages", message_count)
+        st.metric("Your messages", user_messages)
+        st.metric("Bot responses", assistant_messages)
+        
+        # Last message preview
+        st.subheader("Last Message")
+        if st.session_state.messages:
+            last_message = st.session_state.messages[-1]
+            role = "You" if last_message["role"] == "user" else "Bot"
+            content = last_message["content"]
+            preview = content[:30] + "..." if len(content) > 30 else content
+            st.write(f"**{role}:** {preview}")
         else:
-            st.subheader("🚀 Project Information")
-            st.info("Beautiful demo for Golf Swing 3D Analyzer project!")
-            st.success("✅ Streamlit demo is running successfully!")
+            st.write("No messages yet")
+
+
+def main() -> None:
+    """
+    Main function to run the Streamlit chat application.
+    
+    This function initializes the app, handles user interactions,
+    and manages the chat interface.
+    """
+    try:
+        # Page configuration
+        st.set_page_config(
+            page_title="Hello World Chat",
+            page_icon="🌍",
+            layout="centered"
+        )
         
-        # Interactive elements
-        user_name = st.text_input("이름을 입력하세요 / Enter your name:", "World")
-        if st.button("🎉 Say Hello!"):
-            st.balloons()
-            st.write(f"### Hello, {user_name}! 안녕하세요, {user_name}님!")
-    
-    with col2:
-        if show_chart:
-            st.subheader("📊 Interactive Visualization")
-            fig = create_animated_chart()
-            st.plotly_chart(fig, use_container_width=True)
+        # Initialize session state
+        initialize_session_state()
         
-        # Status info
-        st.subheader("📋 System Status")
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        st.metric("Current Time", current_time)
-        st.metric("Demo Status", "Active", delta="Running")
-    
-    # Footer
-    st.markdown("---")
-    st.markdown(
-        "**SMP-7 Implementation** | "
-        "🏌️ Golf Swing 3D Analyzer | "
-        f"⏰ Last updated: {current_time}"
-    )
-    
-    logger.info(f"Demo accessed at {current_time}")
+        # Main interface
+        st.title("Hello World Chat App 🌍")
+        st.write("Welcome to our simple chat application! Say hello to get started.")
+        
+        # Display existing messages
+        display_chat_messages()
+        
+        # Handle new user input
+        if prompt := st.chat_input("Say hello..."):
+            handle_user_input(prompt)
+        
+        # Render sidebar
+        render_sidebar()
+        
+    except Exception as e:
+        logger.error(f"Application error: {e}")
+        st.error("An error occurred. Please refresh the page.")
+        raise
+
 
 if __name__ == "__main__":
     main()

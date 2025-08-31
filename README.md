@@ -1,6 +1,6 @@
-# Golf Swing 3D Analyzer
+# Hello World Chat App - SMP-7 Test Implementation
 
-골프 스윙 분석을 위한 FastAPI 기반 백엔드 서비스입니다.
+Simple Streamlit chat application with intentional bugs for AstraSprint pipeline testing.
 
 ## 프로젝트 구조
 
@@ -50,29 +50,31 @@ pip install -r requirements.txt
 
 2. 서버 실행:
 ```bash
-# 메인 골프 스윙 분석기
-streamlit run demo/src/app.py
-
-# 아름다운 Hello World 데모 (SMP-7)
+# 아름다운 Hello World 채팅 데모 (SMP-7)
 streamlit run demo_hello_world.py
+
+# 기존 골프 스윙 분석기 (백업)
+streamlit run demo/src/app.py
 ```
 
 ## 기능
 
-### 1. 비디오 업로드
-- 골프 스윙 비디오 파일 업로드 (지원 형식: mp4, avi, mov)
-- 자동 포맷 검증 및 처리
+### 1. 간단한 채팅 인터페이스
+- 기본적인 텍스트 입력/출력
+- 메시지 히스토리 표시
+- "hello"와 "bye" 키워드 인식
 
-### 2. 스윙 분석
-- 실시간 포즈 추정
-- 주요 관절 각도 분석
-- 스윙 궤적 시각화
-- 프레임별 상세 분석 데이터 제공
+### 2. 의도적인 버그들 (테스트용)
+- 메시지 순서가 잘못 표시됨 (최신 메시지가 위에)
+- 일부 입력에 대한 응답 누락
+- 채팅 클리어 버튼이 즉시 작동하지 않음
+- 메시지 카운트 오류
+- 빈 메시지 리스트 처리 오류
 
-### 3. 결과 시각화
-- 스윙 궤적 3D 렌더링
-- 주요 지표 그래프 표시
-- 프레임별 포즈 추정 결과 표시
+### 3. 사이드바 설정
+- 채팅 클리어 기능 (버그 있음)
+- 메시지 통계 표시 (부정확함)
+- 마지막 메시지 미리보기 (오류 발생 가능)
 
 ## 라이센스
 
