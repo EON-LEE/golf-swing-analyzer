@@ -22,10 +22,21 @@ def hello_world() -> None:
     Raises:
         RuntimeError: If message display fails
     """
+    messages = [
+        "Hello World",
+        "안녕하세요, 세계!",
+        "Hello World message displayed successfully"
+    ]
+    
     try:
-        logger.info("Hello World")
-        logger.info("안녕하세요, 세계!")
-        logger.info("Hello World message displayed successfully")
+        for i, message in enumerate(messages, 1):
+            logger.info(message)
+            # Validate logging worked by checking if handlers exist
+            if not logger.handlers and not logging.getLogger().handlers:
+                raise RuntimeError("Logging system not properly configured")
+        
+        logger.debug(f"Successfully displayed {len(messages)} messages")
+        
     except Exception as e:
         error_msg = f"Error displaying hello world message: {e}"
         logger.error(error_msg)

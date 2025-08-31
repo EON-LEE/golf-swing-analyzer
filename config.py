@@ -66,7 +66,13 @@ def get_config(section: str) -> Dict[str, Any]:
         
     Raises:
         KeyError: If section doesn't exist
+        ValueError: If section is empty or invalid
     """
+    if not section or not isinstance(section, str):
+        raise ValueError("Section must be a non-empty string")
+    
+    section = section.lower().strip()
+    
     configs = {
         'logging': LOGGING_CONFIG,
         'video': VIDEO_CONFIG,
@@ -75,9 +81,10 @@ def get_config(section: str) -> Dict[str, Any]:
     }
     
     if section not in configs:
-        raise KeyError(f"Configuration section '{section}' not found")
+        available_sections = ', '.join(configs.keys())
+        raise KeyError(f"Configuration section '{section}' not found. Available: {available_sections}")
     
-    return configs[section]
+    return configs[section].copy()  # Return copy to prevent modification
 
 
 def setup_logging() -> None:
@@ -86,11 +93,32 @@ def setup_logging() -> None:
 
 
 def ensure_directories() -> None:
-    """Ensure all required directories exist."""
+    """
+    Ensure all required directories exist.
+    
+    Raises:
+        OSError: If directory creation fails due to permissions or disk space
+        RuntimeError: If critical directories cannot be created
+    """
     directories = [DEMO_DIR, LOGS_DIR, CACHE_DIR, REF_DIR]
+    failed_dirs = []
     
     for directory in directories:
-        directory.mkdir(exist_ok=True)
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            # Verify directory is writable
+            test_file = directory / '.write_test'
+            try:
+                test_file.touch()
+                test_file.unlink()
+            except (OSError, PermissionError):
+                failed_dirs.append(f"{directory} (not writable)")
+        except (OSError, PermissionError) as e:
+            failed_dirs.append(f"{directory} ({e})")
+    
+    if failed_dirs:
+        error_msg = f"Failed to create/access directories: {', '.join(failed_dirs)}"
+        raise RuntimeError(error_msg)
 
 
 if __name__ == "__main__":
