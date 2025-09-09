@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World Chatbot</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Hello World Chatbot 🤖</h1>
+        <div id="chat-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+        <div class="input-area">
+            <label for="message-input" class="sr-only">Message input</label>
+            <input type="text" id="message-input" 
+                   placeholder="메시지를 입력하세요... Type a message..." 
+                   maxlength="500" 
+                   aria-describedby="input-help">
+            <button onclick="sendMessage()" aria-label="Send message">Send</button>
+            <button onclick="clearChat()" aria-label="Clear chat history">Clear</button>
+        </div>
+        <div id="input-help" class="sr-only">Maximum 500 characters</div>
+    </div>
+
+    <script>
+        let isProcessing = false;
+        
+        function sendMessage() {
+            if (isProcessing) return;
+            
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            isProcessing = true;
+            addMessage('You', escapeHtml(message), 'user');
+            input.value = '';
+            
+            fetch('/message', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'message=' + encodeURIComponent(message)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text);
+                    });
+                }
+                return response.text();
+            })
+            .then(reply => addMessage('Bot', reply, 'bot'))
+            .catch(error => addMessage('Bot', error.message, 'bot error'))
+            .finally(() => {
+                isProcessing = false;
+                input.focus();
+            });
+        }
+        
+        function addMessage(sender, text, type) {
+            const messages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'message ' + type;
+            div.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        function clearChat() {
+            const messages = document.getElementById('chat-messages');
+            messages.innerHTML = '';
+            document.getElementById('message-input').focus();
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        document.getElementById('message-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !isProcessing) {
+                sendMessage();
+            }
+        });
+        
+        // Focus input on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('message-input').focus();
+        });
+    </script>
+</body>
+</html>
