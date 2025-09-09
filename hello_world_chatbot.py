@@ -23,10 +23,12 @@ APP_CONFIG: Dict[str, str] = {
 
 GREETING_KEYWORDS: List[str] = ["hello", "hi", "hey", "안녕", "안녕하세요"]
 FAREWELL_KEYWORDS: List[str] = ["bye", "goodbye", "see you", "안녕히", "잘가"]
+HELP_KEYWORDS: List[str] = ["help", "도움", "commands", "명령어"]
 
 RESPONSES: Dict[str, str] = {
     "greeting": "Hello! How can I help you today? 안녕하세요!",
     "farewell": "Goodbye! Have a great day! 안녕히 가세요!",
+    "help": "Available commands:\n• Greetings: hello, hi, hey, 안녕, 안녕하세요\n• Farewells: bye, goodbye, 안녕히, 잘가\n• Help: help, 도움",
     "default": "I'm a simple chatbot. Try saying hello or goodbye!"
 }
 
@@ -51,8 +53,12 @@ def get_bot_response(user_input: str) -> str:
     """
     user_input_lower = user_input.lower().strip()
     
-    # Farewell responses (check first to avoid conflict with "안녕")
-    if any(farewell in user_input_lower for farewell in FAREWELL_KEYWORDS):
+    # Help responses (check first for priority)
+    if any(help_word in user_input_lower for help_word in HELP_KEYWORDS):
+        return RESPONSES["help"]
+    
+    # Farewell responses (check before greetings to avoid conflict with "안녕")
+    elif any(farewell in user_input_lower for farewell in FAREWELL_KEYWORDS):
         return RESPONSES["farewell"]
     
     # Greeting responses

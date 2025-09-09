@@ -28,13 +28,14 @@ A simple bilingual chatbot built with Streamlit that responds to greetings in Ko
 2. Open your browser to the displayed URL (typically `http://localhost:8501`)
 
 3. Start chatting! Try these examples:
-   - English: "Hello", "Hi", "Hey", "Goodbye", "Bye"
-   - Korean: "안녕", "안녕하세요", "안녕히", "잘가"
+   - English: "Hello", "Hi", "Hey", "Goodbye", "Bye", "Help"
+   - Korean: "안녕", "안녕하세요", "안녕히", "잘가", "도움"
 
 ## Supported Commands
 
 - **Greetings**: hello, hi, hey, 안녕, 안녕하세요
 - **Farewells**: bye, goodbye, see you, 안녕히, 잘가
+- **Help**: help, 도움, commands, 명령어
 - **Other**: Any other input receives a default response
 
 ## Project Structure
